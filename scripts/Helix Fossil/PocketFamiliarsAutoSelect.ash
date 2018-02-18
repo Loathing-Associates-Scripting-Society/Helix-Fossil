@@ -138,7 +138,8 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         //priority += moves_priority_affection[move];
         if (slot_id == SLOT_FRONT)
         {
-        	priority += -secondary_moves_utility_overall[move] * 0.1;
+        	if (f.level < 5)
+	        	priority += -secondary_moves_utility_overall[move] * 0.1;
             priority += primary_moves_utility_overall[move] * 0.1;
         }
         else
