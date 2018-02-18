@@ -1,6 +1,6 @@
 Helix Fossil
 =====
-Combat script. Currently only supports the Pocket Familiars path.
+Combat script. Currently only supports the Pocket Familiars path. Will also auto-build pocket familiar teams, if you want.
 
 Installation
 ----------------
