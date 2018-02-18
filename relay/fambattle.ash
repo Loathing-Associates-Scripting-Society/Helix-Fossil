@@ -16,7 +16,7 @@ void main()
 	buffer page_text = visit_url();
 	//string base_replacement_string = "<b>Your Team</b>";
 	string base_replacement_string = "<td style=\"padding: 5px; border: 1px solid blue;\">";
-	string new_text = "<div style=\"position:absolute;\">";
+	string new_text = "<div style=\"position:absolute;z-index:1000;\">";
 	new_text += "<form method=\"post\" action=\"fambattle.php\">";
 	new_text += "<input type=\"submit\" class=\"button\" value=\"Script\" alt=\"Helix Fossil v" + __helix_fossil_version + "\" title=\"Helix Fossil v" + __helix_fossil_version + "\">";
 	new_text += "<input type=\"hidden\" name=\"helix_fossil_api_request\" value=\"true\">";
