@@ -2490,7 +2490,7 @@ boolean have_familiar_replacement(familiar f)
 boolean familiar_is_usable(familiar f)
 {
     //r13998 has most of these
-    if (my_path_id() == PATH_AVATAR_OF_BORIS || my_path_id() == PATH_AVATAR_OF_JARLSBERG || my_path_id() == PATH_AVATAR_OF_SNEAKY_PETE || my_path_id() == PATH_ACTUALLY_ED_THE_UNDYING || my_path_id() == PATH_LICENSE_TO_ADVENTURE)
+    if (my_path_id() == PATH_AVATAR_OF_BORIS || my_path_id() == PATH_AVATAR_OF_JARLSBERG || my_path_id() == PATH_AVATAR_OF_SNEAKY_PETE || my_path_id() == PATH_ACTUALLY_ED_THE_UNDYING || my_path_id() == PATH_LICENSE_TO_ADVENTURE || my_path_id() == PATH_POCKET_FAMILIARS)
         return false;
     if (!is_unrestricted(f))
         return false;
@@ -4034,7 +4034,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.0";
+string __helix_fossil_version = "1.0.1";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
 int POCKET_FAMILIAR_OWNER_TYPE_OURS = 1;
@@ -4373,6 +4373,12 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_FRONTMOST;
         stats.total_healed = 10000; //will auto-clamp
     }
+    else if (move == "Regrow")
+    {
+        //Heal the frontmost ally by [power]
+        //stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_FRONTMOST;
+        stats.total_healed = MIN((move_familiar.max_hp - move_familiar.hp), move_familiar.attack); //will auto-clamp
+    }
     else if (move == "Backstab")
     {
     	//Deal 1 damage to the rearmost enemy and poison it.
@@ -4432,9 +4438,38 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         {
         	
         }
+        if (stats.enemy_attributes["poison"])
+        {
+            PocketFamiliar frontmost_enemy_familiar;
+            foreach key, enemy_familiar in opponents_familiars
+            {
+                if (enemy_familiar.knocked_out)
+                     continue;
+                frontmost_enemy_familiar = enemy_familiar;
+                break;
+            }
+            if (frontmost_enemy_familiar.special_attributes["Poisoned"])
+                remove stats.enemy_attributes["poison"];
+        }
+	}
+	if (stats.affects_type == POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_REARMOST)
+	{
+		if (stats.enemy_attributes["poison"])
+        {
+            PocketFamiliar rearmost_enemy_familiar;
+            foreach key, enemy_familiar in opponents_familiars
+            {
+                if (enemy_familiar.knocked_out)
+                     continue;
+                rearmost_enemy_familiar = enemy_familiar;
+            }
+            if (rearmost_enemy_familiar.special_attributes["Poisoned"])
+            	remove stats.enemy_attributes["poison"];
+        }
 	}
     if (stats.affects_type == POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM)
     {
+    	//FIXME if all are poisoned, don't
         if (stats.total_damage_done > 0)
         {
             int maximum_enemy_hp = 0;
@@ -4534,6 +4569,8 @@ buffer PocketFamiliarsFightRound()
                 move.priority += stats.total_damage_avoided * damage_avoided_multiplier;
                 move.priority += stats.total_enemy_attack_reduction * total_attack_reduction_multiplier;
                 move.priority += stats.total_our_attack_increase * total_attack_increase_multiplier;
+                if (stats.enemy_attributes["poison"])
+                	move.priority += 2 * damage_multiplier; //FIXME maximum health, etc
             	if (stats.is_ultimate_move)
              		move.priority += 1; //resolve ties to avoid ultimate moves until we need them. like, if your ultimate move deals five damage to the front row, you probably shouldn't use it on an enemy with one HP.
             	selections[selections.count()] = move;
