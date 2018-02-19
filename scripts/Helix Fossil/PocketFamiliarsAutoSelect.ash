@@ -1,5 +1,5 @@
 import "scripts/Helix Fossil/Pocket Familiars.ash";
-
+//import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 boolean __setting_show_priorities = false;
 
 Record PocketFamiliarsFamTeamStatus
@@ -62,7 +62,7 @@ Record PocketFamiliarsTeamBuildingSettings
 	boolean make_familiars_smart;
 };
 
-float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean prefer_level_fives, boolean already_have_secondary_attack, float average_of_non_five_familiars_so_far, int non_five_familiars_so_far)
+float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean prefer_level_fives, boolean already_have_secondary_attack, float average_of_non_five_familiars_so_far, int non_five_familiars_so_far, boolean [string] moves_already_have)
 {
 	int REPLACEME = 0;
 	
@@ -91,10 +91,10 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     
     if (!already_have_secondary_attack)
     {
-        secondary_moves_utility_overall["Backstab"] = -100; //Deal 1 damage to the rearmost enemy and poison it.
+        secondary_moves_utility_overall["Backstab"] = -150; //Deal 1 damage to the rearmost enemy and poison it.
         secondary_moves_utility_overall["Breathe Fire"] = -100; //Deal 1 damage to all enemies.
         secondary_moves_utility_overall["Howl"] = -100; //Deal 1 damage to all enemies.
-        secondary_moves_utility_overall["Laser Beam"] = -100; //Deal 2 damage to a random enemy
+        secondary_moves_utility_overall["Laser Beam"] = -150; //Deal 2 damage to a random enemy. Ideal for countering those regenerating familiars.
         secondary_moves_utility_overall["Splash"] = -100; //Deal 1 damage to two random enemies
         secondary_moves_utility_overall["Stinkblast"] = -100; //Deal 1 damage to a random enemy and poison it
     }
@@ -107,14 +107,25 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         secondary_moves_utility_overall["Splash"] = -5; //Deal 1 damage to two random enemies
         secondary_moves_utility_overall["Stinkblast"] = -1; //Deal 1 damage to a random enemy and poison it
     }
+    if (!moves_already_have["Laser Beam"] && !moves_already_have["Backstab"])
+    {
+    	secondary_moves_utility_overall["Laser Beam"] += -10; //kill regenerating familiars
+        secondary_moves_utility_overall["Backstab"] += -10; //kill regenerating familiars
+    }
     secondary_moves_utility_overall["Chill Out"] = REPLACEME; //Make a random enemy Tired. Or... doesn't do anything at all?
     secondary_moves_utility_overall["Embarrass"] = -1; //Reduce a random enemy's power by 1
     secondary_moves_utility_overall["Frighten"] = -1; //Reduce the frontmost enemy's power by 1
     secondary_moves_utility_overall["Growl"] = -1; //Reduce 2 random enemies' power by 1.
     secondary_moves_utility_overall["Hug"] = -5; //Heal the frontmost ally by [power"]
     secondary_moves_utility_overall["Lick"] = -4; //Heal all allies for 1
-    if (slot_id == SLOT_BACK && prefer_level_fives)
-    	secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -10000;
+    if (slot_id == SLOT_BACK)
+    {
+    	if (prefer_level_fives)
+	    	secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -10000;
+        else
+            secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -100;
+    }
+    
     //float [int][string] moves_priority;
     /*moves_priority[1]["Retreat"] = 100;
     moves_priority[2]["Retreat"] = 100;
@@ -193,6 +204,12 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         else
         	priority -= 20.0;
     }
+    
+    if (f.level == 1 && $item[piracetam].item_amount() > 0 && !f.special_attributes["Smart"])
+    {
+    	//Prefer level-one familiars for piracetam. It's less efficient on higher-level familiars.
+    	priority -= 10.0;
+    }
     if (slot_id == SLOT_FRONT)
     {
         if (f.special_attributes["Regenerating"])
@@ -262,12 +279,20 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             
             boolean already_have_secondary_attack = false;
             int score_familiar_as_slot = slot_id;
+            boolean [string] moves_already_have;
+            for i from 0 to 2
+            {
+            	if (!(chosen_team contains i)) continue;
+                foreach s in familiars_have[chosen_team[i]].moves
+                	moves_already_have[s] = true;
+            }
             if (slot_id == 1)
             {
             	//If slot 2 already has a secondary damaging skill, score as slot zero, since we can always alternate. Unless that one dies, I suppose.
             	foreach s in $strings[Backstab,Breathe Fire,Howl,Laser Beam,Splash,Stinkblast]
                 {
-                	if (familiars_have[chosen_team[2]].moves[s])
+                	//if (familiars_have[chosen_team[2]].moves[s])
+                    if (moves_already_have[s])
                     {
                     	already_have_secondary_attack = true;
                         break;
@@ -288,7 +313,7 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             float [familiar] priorities;
             foreach key, f in familiars
             {
-                priorities[f.f] = PocketFamiliarsScoreFamiliarForSlot(f, score_familiar_as_slot, level_five_or_equivalent_familiars_have < settings.minimum_level_5s_wanted, already_have_secondary_attack, average_of_non_five_familiars_so_far, non_five_familiar_count);
+                priorities[f.f] = PocketFamiliarsScoreFamiliarForSlot(f, score_familiar_as_slot, level_five_or_equivalent_familiars_have < settings.minimum_level_5s_wanted, already_have_secondary_attack, average_of_non_five_familiars_so_far, non_five_familiar_count, moves_already_have);
             }
             sort familiars by priorities[value.f];
             
@@ -340,14 +365,26 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             print_html("Switching slot " + slot_id + " to " + f);
             visit_url("famteam.php?slot=" + slot_id + "&fam=" + f.to_int() + "&action=slot");
         }
-        if ($item[piracetam].item_amount() > 0 && !familiars_have[f].special_attributes["Smart"] && familiars_have[f].level < 5 && settings.make_familiars_smart)
-        {
-        	print("Feeding piracetam to " + f); 
-        	visit_url("famteam.php?iid=9751&fam=" + f.to_int() + "&action=feed");
-            cli_execute("refresh inventory");
-        }
 	}
-	
+	if ($item[piracetam].item_amount() > 0 && settings.make_familiars_smart)
+	{
+		familiar [int] chosen_team_copy;
+    	foreach key, f in chosen_team
+        	chosen_team_copy.listAppend(f);
+        sort chosen_team_copy by familiars_have[value].level;
+        foreach key, f in chosen_team_copy
+        {
+        	//Don't make the space jellyfish (or killer bee, if we don't have the fish) smart, because we'll be bringing them along for quite a while.
+        	if (f == $familiar[space jellyfish]) continue;
+            if (f == $familiar[killer bee] && !(familiars_have contains $familiar[space jellyfish])) continue;
+            if ($item[piracetam].item_amount() > 0 && !familiars_have[f].special_attributes["Smart"] && familiars_have[f].level < 5 && settings.make_familiars_smart)
+            {
+                print("Feeding piracetam to " + f);
+                visit_url("famteam.php?iid=9751&fam=" + f.to_int() + "&action=feed");
+                cli_execute("refresh inventory");
+            }
+        } 
+	}
 	
 }
 

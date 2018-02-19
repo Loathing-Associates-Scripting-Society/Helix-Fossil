@@ -4034,7 +4034,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.0.6";
+string __helix_fossil_version = "1.0.7";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
 int POCKET_FAMILIAR_OWNER_TYPE_OURS = 1;
@@ -4063,8 +4063,8 @@ Record PocketFamiliar
 
 Record PocketFamiliarFightStatus
 {
-	PocketFamiliar [int] our_familiars;
-    PocketFamiliar [int] opponents_familiars;
+	PocketFamiliar [int] player_familiars;
+    PocketFamiliar [int] monster_familiars;
     monster m;
     string monster_name_raw;
 };
@@ -4175,21 +4175,21 @@ PocketFamiliarFightStatus PocketFamiliarsParsePage(buffer page_text)
         
         if (f.owner == POCKET_FAMILIAR_OWNER_TYPE_OURS)
         {
-        	status.our_familiars[status.our_familiars.count()] = f;
+        	status.player_familiars[status.player_familiars.count()] = f;
         }
         if (f.owner == POCKET_FAMILIAR_OWNER_TYPE_OPPONENTS)
         {
-            status.opponents_familiars[status.opponents_familiars.count()] = f;
+            status.monster_familiars[status.monster_familiars.count()] = f;
         }
         string newline_text = "<br>&nbsp;&nbsp;&nbsp;&nbsp;";
 	}
-	//Reverse status.opponents_familiars:
+	//Reverse status.monster_familiars:
 	PocketFamiliar [int] new_opponent_familiars;
-	foreach key, f in status.opponents_familiars
+	foreach key, f in status.monster_familiars
 	{
-		new_opponent_familiars[status.opponents_familiars.count() - 1 - key] = f;
+		new_opponent_familiars[status.monster_familiars.count() - 1 - key] = f;
 	}
-	status.opponents_familiars = new_opponent_familiars;
+	status.monster_familiars = new_opponent_familiars;
 	if (my_id() == 1557284)
 		logprint("POKEMON_FIGHT_STATUS: " + status.to_json());
 	__pocket_familiar_fight_status = status;
@@ -4200,9 +4200,10 @@ PocketFamiliarFightStatus PocketFamiliarsParsePage(buffer page_text)
 int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_UNKNOWN = 0;
 int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_FRONTMOST = 1;
 int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_REARMOST = 2;
-int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM = 3;
-int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_ALL = 4;
-int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_DISTRIBUTED = 5;
+int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_INDIVIDUAL = 3;
+int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_MULTIPLE = 4;
+int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_ALL = 5;
+int POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_DISTRIBUTED = 6;
 Record PocketFamiliarMoveStats
 {
 	int total_damage_done;
@@ -4246,7 +4247,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
 	else if (move == "Stinkblast")
 	{
 		//Deal 1 damage to a random enemy and poison it
-        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM;
+        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_INDIVIDUAL;
         stats.total_damage_done = 1;
         stats.enemy_attributes["poison"] = true;
 	}
@@ -4283,7 +4284,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
     else if (move == "Bite")
     {
     	//Deal [power] damage to a random enemy.
-        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM;
+        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_INDIVIDUAL;
         stats.total_damage_done = move_familiar.attack;
     }
     else if (move == "Howl" || move == "Breathe Fire")
@@ -4304,7 +4305,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
     }
     else if (move == "Growl")
     {
-        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM;
+        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_MULTIPLE;
         
         foreach key, enemy_familiar in opponents_familiars
         {
@@ -4319,7 +4320,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
     else if (move == "Splash")
     {
         //Deal 1 damage to two random enemies.
-        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM;
+        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_MULTIPLE;
         foreach key, enemy_familiar in opponents_familiars
         {
             if (enemy_familiar.knocked_out)
@@ -4467,17 +4468,24 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
             	remove stats.enemy_attributes["poison"];
         }
 	}
-    if (stats.affects_type == POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM)
+    if (stats.affects_type == POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_INDIVIDUAL)
     {
     	//FIXME if all are poisoned, don't
         if (stats.total_damage_done > 0)
         {
             int maximum_enemy_hp = 0;
+            boolean all_have_regenerate = true;
             foreach key, enemy_familiar in opponents_familiars
             {
+                if (enemy_familiar.knocked_out)
+                     continue;
                 maximum_enemy_hp = MAX(enemy_familiar.hp, maximum_enemy_hp);
+                if (!enemy_familiar.special_attributes["Regenerating"])
+                	all_have_regenerate = false;
             }
             stats.total_damage_done = MIN(maximum_enemy_hp, stats.total_damage_done);
+            if (all_have_regenerate)
+            	stats.total_damage_done = MAX(0, stats.total_damage_done - 1);
         }
     }
 	
@@ -4518,14 +4526,14 @@ buffer PocketFamiliarsFightRound()
         
     	string [int] usable_moves_submit;
         string [string] inverse_mapping;
-        foreach key, f in status.our_familiars
+        foreach key, f in status.player_familiars
         {
         	foreach move_name, move_submit in f.usable_moves_mapping
             {
             	usable_moves_submit.listAppend(move_submit);
              	inverse_mapping[move_submit] = move_name;
               
-                //PocketFamiliarMoveStats stats = PocketFamiliarCalculateMoveStats(move_name, f, status.our_familiars, status.opponents_familiars);
+                //PocketFamiliarMoveStats stats = PocketFamiliarCalculateMoveStats(move_name, f, status.player_familiars, status.monster_familiars);
                 
             }
         }
@@ -4555,14 +4563,14 @@ buffer PocketFamiliarsFightRound()
         
         
         MoveSelection [int] selections;
-        foreach key, f in status.our_familiars
+        foreach key, f in status.player_familiars
         {
             foreach move_name, move_submit in f.usable_moves_mapping
             {
             	MoveSelection move;
                 move.name = move_name;
                 move.submit_value = move_submit;
-                PocketFamiliarMoveStats stats = PocketFamiliarCalculateMoveStats(move_name, f, status.our_familiars, status.opponents_familiars);
+                PocketFamiliarMoveStats stats = PocketFamiliarCalculateMoveStats(move_name, f, status.player_familiars, status.monster_familiars);
                 move.priority += stats.total_damage_done * damage_multiplier;
                 move.priority += stats.total_healed * heal_multiplier;
                 move.priority += universal_move_priority[move_name];
@@ -4602,6 +4610,7 @@ buffer PocketFamiliarsFight(boolean from_relay)
 {
 	buffer page_text;
 	int breakout = 100;
+	boolean fight_finished = false;
 	while (breakout > 0)
 	{
 		breakout -= 1;
@@ -4610,17 +4619,21 @@ buffer PocketFamiliarsFight(boolean from_relay)
         	break;
         if (page_text.contains_text("<!--WINWINWIN-->"))
         {
+        	fight_finished = true;
             print("Winner!");
             break;
         }
         if (page_text.contains_text("You slink away, dejected and defeated."))
         {
+        	fight_finished = true;
         	print("We lost!");
             if (!from_relay)
 	            abort("We lost, stopping.");
             break;
         }
     }
+    if (breakout <= 0 && !fight_finished)
+    	abort("Fight didn't finish?");
     return page_text;
 }
 
