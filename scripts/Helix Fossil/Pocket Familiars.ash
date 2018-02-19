@@ -4034,7 +4034,8 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.0.7";
+string __helix_fossil_version = "1.0.8";
+//import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
 int POCKET_FAMILIAR_OWNER_TYPE_OURS = 1;

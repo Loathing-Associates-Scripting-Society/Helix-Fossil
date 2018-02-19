@@ -1,5 +1,5 @@
 import "scripts/Helix Fossil/Pocket Familiars.ash";
-//import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
+
 boolean __setting_show_priorities = false;
 
 Record PocketFamiliarsFamTeamStatus
@@ -77,7 +77,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     primary_moves_utility_overall["Claw"] = -50; //Deal [power] damage to the frontmost enemy and 1 damage to a random enemy.
     primary_moves_utility_overall["Peck"] = 0; //Deal [power] damage to the frontmost enemy
     primary_moves_utility_overall["Punch"] = -25; //Deal [power] damage to the frontmost enemy and reduce its power by 1.
-    primary_moves_utility_overall["Sting"] = -24; //Deal [power] damage to the frontmost enemy and poison it.
+    primary_moves_utility_overall["Sting"] = -75; //Deal [power] damage to the frontmost enemy and poison it.
 	
 	float [string] secondary_moves_utility_overall; //in the second or third position
 	secondary_moves_utility_overall["Swoop"] = 10; //Avoid all attack damage this turn.
@@ -116,8 +116,9 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     secondary_moves_utility_overall["Embarrass"] = -1; //Reduce a random enemy's power by 1
     secondary_moves_utility_overall["Frighten"] = -1; //Reduce the frontmost enemy's power by 1
     secondary_moves_utility_overall["Growl"] = -1; //Reduce 2 random enemies' power by 1.
-    secondary_moves_utility_overall["Hug"] = -5; //Heal the frontmost ally by [power"]
+    secondary_moves_utility_overall["Hug"] = -10; //Heal the frontmost ally by [power"]
     secondary_moves_utility_overall["Lick"] = -4; //Heal all allies for 1
+    secondary_moves_utility_overall["Regrow"] = -5 * MAX(0, f.hp - 1); //Heal itself by [power]
     if (slot_id == SLOT_BACK)
     {
     	if (prefer_level_fives)
@@ -125,6 +126,15 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         else
             secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -100;
     }
+    
+    float [string] secondary_moves_utility_always;
+    /*foreach move in moves_already_have
+    {
+    	if (!(secondary_moves_utility_overall contains move))
+     		continue;
+		//print_html("Already have " + move);
+		secondary_moves_utility_always[move] += 25.0; //we already have it
+    }*/
     
     //float [int][string] moves_priority;
     /*moves_priority[1]["Retreat"] = 100;
@@ -155,15 +165,17 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         }
         else
             priority += secondary_moves_utility_overall[move];
+        priority += secondary_moves_utility_always[move];
         if (slot_id == SLOT_MIDDLE)
-        	priority += primary_moves_utility_overall[move] * 0.01; //kinda
+        	priority += primary_moves_utility_overall[move] * -0.1; //kinda
         
     }
         
+    //attack + hp is not linearly correlated to level; some familiars, like the software bug, have maxed out stats at level four
     if (prefer_level_fives)
-	    priority += -10.0 * f.level;
+	    priority += -10.0 * (f.attack + f.hp);
     else
-        priority += -1.0 * f.level;
+        priority += -1.0 * (f.attack + f.hp);
     if (slot_id == SLOT_FRONT)
     {
     	priority += -2.5 * f.attack;
@@ -171,10 +183,12 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     }
     else
     {
-        priority += -1.5 * f.attack;
-        priority += -1.0 * f.hp;
+        priority += -1.0 * f.attack;
+        priority += -2.0 * f.hp;
     }
-    priority += 2.0 * abs(f.attack - f.hp); //prefer attack/hp to be close to one another. In other words, the pet cheezling - which is one attack and five HP - is no? Unless it should be because you're casting attack up... who knows?
+    if (abs(f.attack - f.hp) >= 4) //avoid familiars with one strength and five hearts
+    	priority += 10.0;
+    //priority += 2.0 * abs(f.attack - f.hp); //prefer attack/hp to be close to one another. In other words, the pet cheezling - which is one attack and five HP - is no? Unless it should be because you're casting attack up... who knows?
     
     if (!prefer_level_fives && f.level != 5)
     {
@@ -184,7 +198,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         //print_html(average_of_non_five_familiars_so_far + " vs " + average_after_adding_familiar);
         float increase_over_three = average_after_adding_familiar - 3.0;
         //print_html(f.f + ": " + f.level + ": " + increase_over_three);
-        if (increase_over_three > 0.0)
+        if (increase_over_three > 0.0 && non_five_familiars_so_far > 0)
 	        priority += 100.0 * increase_over_three;
     }
     if (f.level == 5)
@@ -200,7 +214,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     if (f.special_attributes["Smart"] && f.level < 5)
     {
     	if (prefer_level_fives)
-	        priority -= 10.0;
+	        priority -= 5.0;
         else
         	priority -= 20.0;
     }
@@ -222,7 +236,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     else
     {
         if (f.special_attributes["Regenerating"])
-            priority -= 2.0;
+            priority -= 10.0;
         if (f.special_attributes["Spiked"])
             priority -= 1.0;
         if (f.special_attributes["Armor"])
@@ -243,6 +257,15 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
     {
     	familiars_have[f.f] = f;
     }
+    
+    
+    familiar [int] spiky_burst_familiars;
+    spiky_burst_familiars.listAppend($familiar[space jellyfish]); //has Backstab, which is an attack we can alternate with
+    spiky_burst_familiars.listAppend($familiar[killer bee]); //has growl, which can weaken enemy attack
+    spiky_burst_familiars.listAppend($familiar[Mutant Cactus Bud]); //regenerates, but doesn't have a good secondary
+    spiky_burst_familiars.listAppend($familiar[bark scorpion]); //similar to bee, but very little HP
+    spiky_burst_familiars.listAppend($familiar[Dramatic Hedgehog]); //out of standard
+    
 	
 	//Pick a good team that... wait
 	//Pick a team.
@@ -258,22 +281,32 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
         }
         //FIXME if chosen_team[2] is non, pick a five-level familiar. though really, if you don't have a killer bee...
 	}*/
-    foreach f in $familiars[space jellyfish,killer bee]
+	familiar chosen_spiky_burst_familiar;
+    foreach key, f in spiky_burst_familiars
     {
         if (!(familiars_have contains f)) continue;
+        if (chosen_spiky_burst_familiar == $familiar[none])
+	        chosen_spiky_burst_familiar = f;
         if (familiars_have[f].level >= 5 && settings.minimum_level_5s_wanted == 0) //have it
         	break;
         chosen_team[2] = f;
         level_five_or_equivalent_familiars_have += 1;
         break;
     }
+    //abort("chosen_spiky_burst_familiar = " + chosen_spiky_burst_familiar);
 	
 	
 	if (true)
 	{
 		//New method:
-        //Pick familiars in reverse order:
-        for slot_id from 2 to 0
+        //Pick familiars in reverse order. Or maybe back, front, middle:
+        
+        int [int] ordering;
+        ordering.listAppend(2);
+        ordering.listAppend(0);
+        ordering.listAppend(1);
+        
+        foreach key_discard_1, slot_id in ordering
         {
             if (chosen_team contains slot_id) continue;
             
@@ -375,8 +408,7 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
         foreach key, f in chosen_team_copy
         {
         	//Don't make the space jellyfish (or killer bee, if we don't have the fish) smart, because we'll be bringing them along for quite a while.
-        	if (f == $familiar[space jellyfish]) continue;
-            if (f == $familiar[killer bee] && !(familiars_have contains $familiar[space jellyfish])) continue;
+        	if (f == chosen_spiky_burst_familiar) continue;
             if ($item[piracetam].item_amount() > 0 && !familiars_have[f].special_attributes["Smart"] && familiars_have[f].level < 5 && settings.make_familiars_smart)
             {
                 print("Feeding piracetam to " + f);
