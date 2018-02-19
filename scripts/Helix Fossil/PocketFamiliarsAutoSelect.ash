@@ -186,7 +186,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
         priority += -1.0 * f.attack;
         priority += -2.0 * f.hp;
     }
-    if (abs(f.attack - f.hp) >= 4) //avoid familiars with one strength and five hearts
+    if (abs(f.attack - f.hp) >= 4 && f.level >= 5) //avoid familiars with one strength and five hearts, but only if there's no more exp to gain
     	priority += 10.0;
     //priority += 2.0 * abs(f.attack - f.hp); //prefer attack/hp to be close to one another. In other words, the pet cheezling - which is one attack and five HP - is no? Unless it should be because you're casting attack up... who knows?
     
