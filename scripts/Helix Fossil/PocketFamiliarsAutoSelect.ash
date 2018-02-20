@@ -60,6 +60,7 @@ Record PocketFamiliarsTeamBuildingSettings
 {
 	int minimum_level_5s_wanted; //or best
 	boolean make_familiars_smart;
+	boolean rebuild_team_if_it_is_low_level;
 };
 
 float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean prefer_level_fives, boolean already_have_secondary_attack, float average_of_non_five_familiars_so_far, int non_five_familiars_so_far, boolean [string] moves_already_have)
@@ -83,7 +84,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
 	secondary_moves_utility_overall["Swoop"] = 10; //Avoid all attack damage this turn.
     secondary_moves_utility_overall["Retreat"] = 100; //Move to the back.
     secondary_moves_utility_overall["Tackle"] = 100; //Knock the frontmost enemy to the back.
-    secondary_moves_utility_overall["Encourage"] = -1; //Increase the frontmost ally's power by 1
+    secondary_moves_utility_overall["Encourage"] = -5; //Increase the frontmost ally's power by 1
     if (f.special_attributes["Armor"])
 	    secondary_moves_utility_overall["Armor Up"] = 10; //Become Armored.
     else
@@ -100,17 +101,32 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     }
     else
     {
-        secondary_moves_utility_overall["Backstab"] = -1; //Deal 1 damage to the rearmost enemy and poison it.
+        secondary_moves_utility_overall["Backstab"] = -6; //Deal 1 damage to the rearmost enemy and poison it.
         secondary_moves_utility_overall["Breathe Fire"] = -5; //Deal 1 damage to all enemies.
         secondary_moves_utility_overall["Howl"] = -5; //Deal 1 damage to all enemies.
         secondary_moves_utility_overall["Laser Beam"] = -5; //Deal 2 damage to a random enemy
         secondary_moves_utility_overall["Splash"] = -5; //Deal 1 damage to two random enemies
-        secondary_moves_utility_overall["Stinkblast"] = -1; //Deal 1 damage to a random enemy and poison it
+        secondary_moves_utility_overall["Stinkblast"] = -6; //Deal 1 damage to a random enemy and poison it
     }
     if (!moves_already_have["Laser Beam"] && !moves_already_have["Backstab"])
     {
     	secondary_moves_utility_overall["Laser Beam"] += -10; //kill regenerating familiars
         secondary_moves_utility_overall["Backstab"] += -10; //kill regenerating familiars
+    }
+    boolean have_poison_attack = false;
+    foreach s in $strings[Backstab,Sting,Stinkblast]
+    {
+    	if (moves_already_have[s])
+        {
+			have_poison_attack = true;
+            break;
+        }
+    }
+    if (!have_poison_attack)
+    {
+    	//regenerating familiars are a nightmare
+    	foreach s in $strings[Backstab,Stinkblast]
+    		secondary_moves_utility_overall[s] += -50.0;
     }
     secondary_moves_utility_overall["Chill Out"] = REPLACEME; //Make a random enemy Tired. Or... doesn't do anything at all?
     secondary_moves_utility_overall["Embarrass"] = -1; //Reduce a random enemy's power by 1
@@ -204,7 +220,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     if (f.level == 5)
     {
         if (!prefer_level_fives)
-            priority += 100.0;
+            priority += 200.0;
     }
     else
     {
@@ -246,17 +262,17 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
 	return priority;
 }
 
-void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
+Record PocketFamiliarsTeamResult
 {
-	familiar [int] chosen_team;
-	
-    PocketFamiliarsFamTeamStatus status = PocketFamiliarsParseFamTeam(visit_url("famteam.php"));
+    familiar [int] chosen_team;
+    familiar chosen_spiky_burst_familiar;
+};
+
+PocketFamiliarsTeamResult PocketFamiliarsCalculateTeam(PocketFamiliarsTeamBuildingSettings settings, PocketFamiliarsFamTeamStatus status, PocketFamiliar [familiar] familiars_have)
+{
+    familiar [int] chosen_team;
+    
     PocketFamiliar [int] familiars = status.familiars;
-    PocketFamiliar [familiar] familiars_have;
-    foreach key, f in familiars
-    {
-    	familiars_have[f.f] = f;
-    }
     
     
     familiar [int] spiky_burst_familiars;
@@ -266,39 +282,39 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
     spiky_burst_familiars.listAppend($familiar[bark scorpion]); //similar to bee, but very little HP
     spiky_burst_familiars.listAppend($familiar[Dramatic Hedgehog]); //out of standard
     
-	
-	//Pick a good team that... wait
-	//Pick a team.
-	int level_five_or_equivalent_familiars_have = 0;
-	/*if (settings.minimum_level_5s_wanted > 0)
-	{
-		foreach f in $familiars[space jellyfish,killer bee]
+    
+    //Pick a good team that... wait
+    //Pick a team.
+    int level_five_or_equivalent_familiars_have = 0;
+    /*if (settings.minimum_level_5s_wanted > 0)
+    {
+        foreach f in $familiars[space jellyfish,killer bee]
         {
-        	if (!(familiars_have contains f)) continue;
+            if (!(familiars_have contains f)) continue;
             chosen_team[2] = f;
             level_five_or_equivalent_familiars_have += 1;
             break;
         }
         //FIXME if chosen_team[2] is non, pick a five-level familiar. though really, if you don't have a killer bee...
-	}*/
-	familiar chosen_spiky_burst_familiar;
+    }*/
+    familiar chosen_spiky_burst_familiar;
     foreach key, f in spiky_burst_familiars
     {
         if (!(familiars_have contains f)) continue;
         if (chosen_spiky_burst_familiar == $familiar[none])
-	        chosen_spiky_burst_familiar = f;
+            chosen_spiky_burst_familiar = f;
         if (familiars_have[f].level >= 5 && settings.minimum_level_5s_wanted == 0) //have it
-        	break;
+            break;
         chosen_team[2] = f;
         level_five_or_equivalent_familiars_have += 1;
         break;
     }
     //abort("chosen_spiky_burst_familiar = " + chosen_spiky_burst_familiar);
-	
-	
-	if (true)
-	{
-		//New method:
+    
+    
+    if (true)
+    {
+        //New method:
         //Pick familiars in reverse order. Or maybe back, front, middle:
         
         int [int] ordering;
@@ -315,19 +331,19 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             boolean [string] moves_already_have;
             for i from 0 to 2
             {
-            	if (!(chosen_team contains i)) continue;
+                if (!(chosen_team contains i)) continue;
                 foreach s in familiars_have[chosen_team[i]].moves
-                	moves_already_have[s] = true;
+                    moves_already_have[s] = true;
             }
             if (slot_id == 1)
             {
-            	//If slot 2 already has a secondary damaging skill, score as slot zero, since we can always alternate. Unless that one dies, I suppose.
-            	foreach s in $strings[Backstab,Breathe Fire,Howl,Laser Beam,Splash,Stinkblast]
+                //If slot 2 already has a secondary damaging skill, score as slot zero, since we can always alternate. Unless that one dies, I suppose.
+                foreach s in $strings[Backstab,Breathe Fire,Howl,Laser Beam,Splash,Stinkblast]
                 {
-                	//if (familiars_have[chosen_team[2]].moves[s])
+                    //if (familiars_have[chosen_team[2]].moves[s])
                     if (moves_already_have[s])
                     {
-                    	already_have_secondary_attack = true;
+                        already_have_secondary_attack = true;
                         break;
                     }
                 }
@@ -336,13 +352,13 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             int non_five_familiar_count = 0;
             foreach i, f in chosen_team
             {
-            	int level = familiars_have[f].level;
-            	if (level == 5) continue;
+                int level = familiars_have[f].level;
+                if (level == 5) continue;
                 average_of_non_five_familiars_so_far += level;
                 non_five_familiar_count += 1;
             }
             if (non_five_familiar_count > 0)
-	            average_of_non_five_familiars_so_far /= to_float(non_five_familiar_count); 
+                average_of_non_five_familiars_so_far /= to_float(non_five_familiar_count); 
             float [familiar] priorities;
             foreach key, f in familiars
             {
@@ -352,10 +368,10 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             
             if (__setting_show_priorities)
             {
-            	string [int] output;
+                string [int] output;
                 foreach key, f in familiars
                 {
-                	output.listAppend(f.f + ": " + priorities[f.f]);
+                    output.listAppend(f.f + ": " + priorities[f.f]);
                 }
                 print_html("Slot " + slot_id + ": " + output.listJoinComponents(", ", ""));
                 print_html("");
@@ -363,8 +379,8 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
             
             foreach key, f in familiars
             {
-            	//if (f.level >= 5 && level_five_or_equivalent_familiars_have >= settings.minimum_level_5s_wanted)
-                	//continue;
+                //if (f.level >= 5 && level_five_or_equivalent_familiars_have >= settings.minimum_level_5s_wanted)
+                    //continue;
                 //print_html("Examining " + f.f + " for slot " + slot_id);
                 
                 boolean no = false;
@@ -376,21 +392,56 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
                     }
                 }
                 if (no)
-                	continue;
+                    continue;
                 //print_html("<font color=red>Picked " + f.f + " for slot " + slot_id + "</font>");
                 chosen_team[slot_id] = f.f;
                 if (f.level >= 5)
-                	level_five_or_equivalent_familiars_have += 1;
+                    level_five_or_equivalent_familiars_have += 1;
                 break;
             }
+        }
+    }
+    
+    
+    PocketFamiliarsTeamResult out;
+    out.chosen_team = chosen_team;
+    out.chosen_spiky_burst_familiar = chosen_spiky_burst_familiar;
+    return out;
+}
+
+void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
+{
+    
+    PocketFamiliarsFamTeamStatus status = PocketFamiliarsParseFamTeam(visit_url("famteam.php"));
+    PocketFamiliar [familiar] familiars_have;
+    foreach key, f in status.familiars
+    {
+        familiars_have[f.f] = f;
+    }
+    PocketFamiliarsTeamResult team = PocketFamiliarsCalculateTeam(settings, status, familiars_have);
+	
+	if (settings.rebuild_team_if_it_is_low_level)
+	{
+		//Basically, include a jellyfish if we're a team of low-levels:
+		float average_level = 0.0;
+        foreach key, f in team.chosen_team
+        {
+        	average_level += familiars_have[f].level;
+        }
+        if (team.chosen_team.count() > 0)
+        	average_level /= to_float(team.chosen_team.count());
+        if (average_level < 2.5)
+        {
+        	settings.minimum_level_5s_wanted += 1;
+            team = PocketFamiliarsCalculateTeam(settings, status, familiars_have);
         }
 	}
 	
 	//famteam.php?slot=1&fam=171&action=slot
 	
-	print_html("Chosen team: " + chosen_team.listJoinComponents(", ", "and") + ".");
+	print_html("Chosen team: " + team.chosen_team.listJoinComponents(", ", "and") + ".");
 	//abort("");
-	foreach key, f in chosen_team
+	foreach key, f in team.chosen_team
 	{
 		int slot_id = key + 1;
         if (status.active_team[slot_id].f != f)
@@ -402,13 +453,13 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
 	if ($item[piracetam].item_amount() > 0 && settings.make_familiars_smart)
 	{
 		familiar [int] chosen_team_copy;
-    	foreach key, f in chosen_team
+    	foreach key, f in team.chosen_team
         	chosen_team_copy.listAppend(f);
         sort chosen_team_copy by familiars_have[value].level;
         foreach key, f in chosen_team_copy
         {
         	//Don't make the space jellyfish (or killer bee, if we don't have the fish) smart, because we'll be bringing them along for quite a while.
-        	if (f == chosen_spiky_burst_familiar) continue;
+        	if (f == team.chosen_spiky_burst_familiar) continue;
             if ($item[piracetam].item_amount() > 0 && !familiars_have[f].special_attributes["Smart"] && familiars_have[f].level < 5 && settings.make_familiars_smart)
             {
                 print("Feeding piracetam to " + f);
