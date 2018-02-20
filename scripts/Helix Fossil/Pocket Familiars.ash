@@ -4034,7 +4034,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.0.10";
+string __helix_fossil_version = "1.1";
 //import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
@@ -4493,9 +4493,8 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
 	return stats;
 }
 
-buffer PocketFamiliarsFightRound()
+buffer PocketFamiliarsFightRound(buffer page_text)
 {
-    buffer page_text = visit_url("fambattle.php");
     if (!page_text.contains_text("<b>Fight!</b></td></tr>"))
     	return page_text;
     PocketFamiliarFightStatus status = PocketFamiliarsParsePage(page_text);
@@ -4609,13 +4608,13 @@ buffer PocketFamiliarsFightRound()
 
 buffer PocketFamiliarsFight(boolean from_relay)
 {
-	buffer page_text;
 	int breakout = 100;
 	boolean fight_finished = false;
+    buffer page_text = visit_url("fambattle.php");
 	while (breakout > 0)
 	{
 		breakout -= 1;
-        page_text = PocketFamiliarsFightRound();
+        page_text = PocketFamiliarsFightRound(page_text);
         if (!page_text.contains_text("<b>Fight!</b></td></tr>"))
         	break;
         if (page_text.contains_text("<!--WINWINWIN-->"))

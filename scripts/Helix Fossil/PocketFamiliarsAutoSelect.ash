@@ -430,7 +430,7 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
         }
         if (team.chosen_team.count() > 0)
         	average_level /= to_float(team.chosen_team.count());
-        if (average_level < 2.5)
+        if (average_level < 2) //2.5?
         {
         	settings.minimum_level_5s_wanted += 1;
             team = PocketFamiliarsCalculateTeam(settings, status, familiars_have);
