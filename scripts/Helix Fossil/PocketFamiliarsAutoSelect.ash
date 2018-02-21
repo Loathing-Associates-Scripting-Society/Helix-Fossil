@@ -78,7 +78,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     primary_moves_utility_overall["Claw"] = -50; //Deal [power] damage to the frontmost enemy and 1 damage to a random enemy.
     primary_moves_utility_overall["Peck"] = 0; //Deal [power] damage to the frontmost enemy
     primary_moves_utility_overall["Punch"] = -25; //Deal [power] damage to the frontmost enemy and reduce its power by 1.
-    primary_moves_utility_overall["Sting"] = -75; //Deal [power] damage to the frontmost enemy and poison it.
+    primary_moves_utility_overall["Sting"] = -100; //Deal [power] damage to the frontmost enemy and poison it.
 	
 	float [string] secondary_moves_utility_overall; //in the second or third position
 	secondary_moves_utility_overall["Swoop"] = 10; //Avoid all attack damage this turn.
@@ -221,6 +221,8 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     {
         if (!prefer_level_fives)
             priority += 200.0;
+        else
+        	priority += -10.0;
     }
     else
     {
@@ -306,7 +308,8 @@ PocketFamiliarsTeamResult PocketFamiliarsCalculateTeam(PocketFamiliarsTeamBuildi
         if (familiars_have[f].level >= 5 && settings.minimum_level_5s_wanted == 0) //have it
             break;
         chosen_team[2] = f;
-        level_five_or_equivalent_familiars_have += 1;
+        if (familiars_have[f].level >= 5)
+	        level_five_or_equivalent_familiars_have += 1;
         break;
     }
     //abort("chosen_spiky_burst_familiar = " + chosen_spiky_burst_familiar);
@@ -430,7 +433,8 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
         }
         if (team.chosen_team.count() > 0)
         	average_level /= to_float(team.chosen_team.count());
-        if (average_level < 2) //2.5?
+        float cutoff = 2;
+        if (average_level < cutoff) //2.5?
         {
         	settings.minimum_level_5s_wanted += 1;
             team = PocketFamiliarsCalculateTeam(settings, status, familiars_have);

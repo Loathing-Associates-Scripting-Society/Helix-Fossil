@@ -4034,7 +4034,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.1";
+string __helix_fossil_version = "1.1.1";
 //import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
@@ -4498,7 +4498,6 @@ buffer PocketFamiliarsFightRound(buffer page_text)
     if (!page_text.contains_text("<b>Fight!</b></td></tr>"))
     	return page_text;
     PocketFamiliarFightStatus status = PocketFamiliarsParsePage(page_text);
-    
     string chosen_move_name;
     string chosen_move_submit;
     
