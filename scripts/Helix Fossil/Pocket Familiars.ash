@@ -2196,6 +2196,32 @@ void testItemIngredients()
     testItemIngredients();
 }*/
 
+
+float numeric_modifier_replacement(item it, string modifier)
+{
+    string modifier_lowercase = modifier.to_lower_case();
+    if (it == $item[your cowboy boots])
+    {
+        if (modifier_lowercase == "monster level" && $slot[bootskin].equipped_item() == $item[diamondback skin])
+        {
+            return 20.0;
+        }
+        if (modifier_lowercase == "initiative" && $slot[bootspur].equipped_item() == $item[quicksilver spurs])
+            return 30;
+        if (modifier_lowercase == "item drop" && $slot[bootspur].equipped_item() == $item[nicksilver spurs])
+            return 30;
+        if (modifier_lowercase == "muscle percent" && $slot[bootskin].equipped_item() == $item[grizzled bearskin])
+            return 50.0;
+        if (modifier_lowercase == "mysticality percent" && $slot[bootskin].equipped_item() == $item[frontwinder skin])
+            return 50.0;
+        if (modifier_lowercase == "moxie percent" && $slot[bootskin].equipped_item() == $item[mountain lion skin])
+            return 50.0;
+        //FIXME deal with rest (resistance, etc)
+    }
+    return numeric_modifier(it, modifier);
+}
+
+
 static
 {
     skill [class][int] __skills_by_class;
@@ -2276,9 +2302,11 @@ static
 
 boolean [item] equipmentWithNumericModifier(string modifier)
 {
+	modifier = modifier.to_lower_case();
     boolean [item] dynamic_items;
     dynamic_items[to_item("kremlin's greatest briefcase")] = true;
     dynamic_items[$item[your cowboy boots]] = true;
+    dynamic_items[$item[a light that never goes out]] = true; //FIXME all smithsness items
     if (!(__equipment_by_numeric_modifier contains modifier))
     {
         //Build it:
@@ -2295,7 +2323,7 @@ boolean [item] equipmentWithNumericModifier(string modifier)
     boolean [item] extra_results;
     foreach it in dynamic_items
     {
-        if (it.numeric_modifier(modifier) != 0.0)
+        if (it.numeric_modifier_replacement(modifier) != 0.0)
         {
             extra_results[it] = true;
         }
@@ -3634,6 +3662,9 @@ item [int] generateEquipmentForExtraExperienceOnStat(stat desired_stat, boolean 
     //foreach it in experience_percent_modifiers
     foreach it in equipmentWithNumericModifier(numeric_modifier_string)
     {
+    	slot s = it.to_slot();
+        if (s == $slot[shirt] && !($skill[Torso Awaregness].have_skill() || $skill[Best Dressed].have_skill()))
+        	continue;
         if (it.available_amount() > 0 && (!require_can_equip_currently || it.can_equip()) && item_slots[it.to_slot()].numeric_modifier(numeric_modifier_string) < it.numeric_modifier(numeric_modifier_string))
         {
             item_slots[it.to_slot()] = it;
@@ -4034,7 +4065,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.1.1";
+string __helix_fossil_version = "1.1.2";
 //import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
@@ -4343,6 +4374,13 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         //Deals 8 damage spread out among all foes randomly.
         stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_DISTRIBUTED;
         stats.total_damage_done = 8;
+        stats.is_ultimate_move = true;
+    }
+    else if (move == "ULTIMATE: Blood Bath")
+    {
+        //???
+        stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_DISTRIBUTED;
+        stats.total_damage_done = 12;
         stats.is_ultimate_move = true;
     }
     else if (move == "ULTIMATE: Nuclear Bomb")

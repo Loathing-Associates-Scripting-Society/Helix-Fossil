@@ -128,7 +128,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     	foreach s in $strings[Backstab,Stinkblast]
     		secondary_moves_utility_overall[s] += -50.0;
     }
-    secondary_moves_utility_overall["Chill Out"] = REPLACEME; //Make a random enemy Tired. Or... doesn't do anything at all?
+    secondary_moves_utility_overall["Chill Out"] = -2; //Make a random enemy Tired. Or... doesn't do anything at all?
     secondary_moves_utility_overall["Embarrass"] = -1; //Reduce a random enemy's power by 1
     secondary_moves_utility_overall["Frighten"] = -1; //Reduce the frontmost enemy's power by 1
     secondary_moves_utility_overall["Growl"] = -1; //Reduce 2 random enemies' power by 1.
@@ -138,9 +138,15 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     if (slot_id == SLOT_BACK)
     {
     	if (prefer_level_fives)
+        {
 	    	secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -10000;
+            secondary_moves_utility_overall["ULTIMATE: Blood Bath"] = -100000;
+        }
         else
+        {
             secondary_moves_utility_overall["ULTIMATE: Spiky Burst"] = -100;
+            secondary_moves_utility_overall["ULTIMATE: Blood Bath"] = -101;
+        }
     }
     
     float [string] secondary_moves_utility_always;
@@ -220,7 +226,7 @@ float PocketFamiliarsScoreFamiliarForSlot(PocketFamiliar f, int slot_id, boolean
     if (f.level == 5)
     {
         if (!prefer_level_fives)
-            priority += 200.0;
+            priority += 2000.0;
         else
         	priority += -10.0;
     }
@@ -278,6 +284,7 @@ PocketFamiliarsTeamResult PocketFamiliarsCalculateTeam(PocketFamiliarsTeamBuildi
     
     
     familiar [int] spiky_burst_familiars;
+    spiky_burst_familiars.listAppend(to_familiar("Slotter")); //has blood bath, which is amusingly overpowered
     spiky_burst_familiars.listAppend($familiar[space jellyfish]); //has Backstab, which is an attack we can alternate with
     spiky_burst_familiars.listAppend($familiar[killer bee]); //has growl, which can weaken enemy attack
     spiky_burst_familiars.listAppend($familiar[Mutant Cactus Bud]); //regenerates, but doesn't have a good secondary
@@ -303,6 +310,7 @@ PocketFamiliarsTeamResult PocketFamiliarsCalculateTeam(PocketFamiliarsTeamBuildi
     foreach key, f in spiky_burst_familiars
     {
         if (!(familiars_have contains f)) continue;
+        if (f == $familiar[none]) continue;
         if (chosen_spiky_burst_familiar == $familiar[none])
             chosen_spiky_burst_familiar = f;
         if (familiars_have[f].level >= 5 && settings.minimum_level_5s_wanted == 0) //have it
@@ -433,7 +441,7 @@ void PocketFamiliarsBuildTeam(PocketFamiliarsTeamBuildingSettings settings)
         }
         if (team.chosen_team.count() > 0)
         	average_level /= to_float(team.chosen_team.count());
-        float cutoff = 2;
+        float cutoff = 2.5;
         if (average_level < cutoff) //2.5?
         {
         	settings.minimum_level_5s_wanted += 1;
