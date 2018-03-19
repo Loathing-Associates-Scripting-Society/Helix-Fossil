@@ -4065,7 +4065,7 @@ float [string] __monster_attributes_float;
 element [string] __monster_attributes_elements;
 boolean [string] __monster_one_crazy_random_summer_modifiers;
 
-string __helix_fossil_version = "1.1.2";
+string __helix_fossil_version = "1.1.3";
 //import "scripts/Helix Fossil/Helix Fossil/Pocket Familiars Alternate Algorithm.ash";
 
 int POCKET_FAMILIAR_OWNER_TYPE_UNKNOWN = 0;
@@ -4088,6 +4088,7 @@ Record PocketFamiliar
 	string [string] move_descriptions;
 	boolean [string] special_attributes;
 	boolean knocked_out;
+	boolean effectively_knocked_out; //they'll die because of poison
 	int owner;
 	
 	string next_round_chosen_enemy_move;
@@ -4122,6 +4123,7 @@ PocketFamiliar PocketFamiliarParseFamiliarFromText(string table_text)
     if (table_text.contains_text("='knockedout' ><tr><td rowspan=2>"))
     {
         f.knocked_out = true;
+        f.effectively_knocked_out = true;
     }
     f.f = level_familiar_info[0][2].to_familiar();
     f.familiar_name_raw = level_familiar_info[0][2];
@@ -4183,6 +4185,9 @@ PocketFamiliar PocketFamiliarParseFamiliarFromText(string table_text)
     {
         f.owner = POCKET_FAMILIAR_OWNER_TYPE_OPPONENTS;
     }
+    //They're effectively dead if they're poisoned and at one HP; cannot save them.
+    if (f.special_attributes["Poisoned"] && f.hp == 1)
+    	f.effectively_knocked_out = true;
     return f;
 }
 
@@ -4305,7 +4310,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         int enemy_familiars_around = 0;
         foreach key, enemy_familiar in opponents_familiars
         {
-            if (enemy_familiar.knocked_out)
+            if (enemy_familiar.effectively_knocked_out)
                  continue;
             enemy_familiars_around += 1;
         }
@@ -4325,7 +4330,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_ALL;
         foreach key, enemy_familiar in opponents_familiars
         {
-            if (enemy_familiar.knocked_out)
+            if (enemy_familiar.effectively_knocked_out)
                  continue;
         	stats.total_damage_done += 1;
         }
@@ -4341,7 +4346,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         
         foreach key, enemy_familiar in opponents_familiars
         {
-            if (enemy_familiar.knocked_out)
+            if (enemy_familiar.effectively_knocked_out)
                  continue;
 			if (enemy_familiar.attack > 1)
 				stats.total_enemy_attack_reduction += 1;
@@ -4355,7 +4360,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_RANDOM_MULTIPLE;
         foreach key, enemy_familiar in opponents_familiars
         {
-            if (enemy_familiar.knocked_out)
+            if (enemy_familiar.effectively_knocked_out)
                  continue;
             stats.total_damage_done += 1;
             if (stats.total_damage_done == 2)
@@ -4396,7 +4401,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         stats.affects_type = POCKET_FAMILIAR_MOVE_AFFECTS_TYPE_ALL;
         foreach key, enemy_familiar in opponents_familiars
         {
-            if (enemy_familiar.knocked_out)
+            if (enemy_familiar.effectively_knocked_out)
                  continue;
             stats.total_damage_done += MIN(enemy_familiar.hp, 2);
         }
@@ -4449,7 +4454,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
         	PocketFamiliar frontmost_enemy_familiar;
             foreach key, enemy_familiar in opponents_familiars
             {
-            	if (enemy_familiar.knocked_out)
+            	if (enemy_familiar.effectively_knocked_out)
              		continue;
                 frontmost_enemy_familiar = enemy_familiar;
                 break;
@@ -4467,7 +4472,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
             PocketFamiliar frontmost_our_familiar;
             foreach key, our_familiar in our_familiars
             {
-                if (our_familiar.knocked_out)
+                if (our_familiar.effectively_knocked_out)
                      continue;
                 frontmost_our_familiar = our_familiar;
                 break;
@@ -4483,7 +4488,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
             PocketFamiliar frontmost_enemy_familiar;
             foreach key, enemy_familiar in opponents_familiars
             {
-                if (enemy_familiar.knocked_out)
+                if (enemy_familiar.effectively_knocked_out)
                      continue;
                 frontmost_enemy_familiar = enemy_familiar;
                 break;
@@ -4499,7 +4504,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
             PocketFamiliar rearmost_enemy_familiar;
             foreach key, enemy_familiar in opponents_familiars
             {
-                if (enemy_familiar.knocked_out)
+                if (enemy_familiar.effectively_knocked_out)
                      continue;
                 rearmost_enemy_familiar = enemy_familiar;
             }
@@ -4516,7 +4521,7 @@ PocketFamiliarMoveStats PocketFamiliarCalculateMoveStats(string move, PocketFami
             boolean all_have_regenerate = true;
             foreach key, enemy_familiar in opponents_familiars
             {
-                if (enemy_familiar.knocked_out)
+                if (enemy_familiar.effectively_knocked_out)
                      continue;
                 maximum_enemy_hp = MAX(enemy_familiar.hp, maximum_enemy_hp);
                 if (!enemy_familiar.special_attributes["Regenerating"])
